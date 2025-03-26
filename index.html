@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Folding Cardboard Box</title>
+  <!-- Import map to resolve "three" -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.1/build/three.module.js"
+    }
+  }
+  </script>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+    <button id="restartButton" style="position: absolute; top: 10px; left: 10px; z-index: 10;">
+        🔁 Restart Animation
+    </button>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.1/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.1/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf5f5f5);
+
+    const camera = new THREE.PerspectiveCamera(
+      45, 
+      window.innerWidth / window.innerHeight, 
+      0.1, 
+      1000
+    );
+    // Just set an initial camera position
+    camera.position.set(0, 30, 40);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // Basic light
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+    scene.add(hemiLight);
+
+    // GLTF loader
+    const loader = new GLTFLoader();
+    let flaps = [];
+    let foldAngle = 0;
+    let secondFoldAngle = 0;
+    let thirdFoldAngle = 0;
+    const foldSpeed = 0.01;
+
+    loader.load('cardbox_11_9_8.glb', (gltf) => {
+      console.log('GLB model loaded successfully!');
+      const model = gltf.scene;
+      scene.add(model);
+
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.material.side = THREE.DoubleSide;
+          console.log('Mesh found:', child.name);
+        }
+      });
+
+      // Center the model
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center);
+
+      // Resize camera so the entire model fits the view
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      camera.position.set(maxDim * 1.2, maxDim * 1.5, maxDim * 1.2);
+      camera.lookAt(0, 0, 0);
+      controls.target.set(0, 0, 0);
+
+      // Find flaps
+      const flapNames = ['Front', 'Back', 'Left', 'Right', 'Top','TopTop','TopLeft','TopRight'];
+      flaps = flapNames.map(name => model.getObjectByName(name));
+
+      animate();
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (foldAngle < Math.PI / 2) {
+            foldAngle +=foldSpeed
+            if (flaps[0]) flaps[0].rotation.x = -foldAngle; // Front
+            if (flaps[1]) flaps[1].rotation.x = foldAngle;  // Back
+            if (flaps[2]) flaps[2].rotation.z = -foldAngle;  // left
+            if (flaps[3]) flaps[3].rotation.z = foldAngle; // right
+        } else if (secondFoldAngle < Math.PI / 2) {
+            secondFoldAngle +=foldSpeed
+            if (flaps[4]) flaps[4].rotation.x = secondFoldAngle;  // Top
+        } else if(thirdFoldAngle <  Math.PI / 2) {
+            thirdFoldAngle +=foldSpeed
+            if (flaps[5]) flaps[5].rotation.x = thirdFoldAngle;  // TopTop
+            if (flaps[6]) flaps[6].rotation.z = -thirdFoldAngle; // TopLeft
+            if (flaps[6]) flaps[7].rotation.z = thirdFoldAngle; // TopRight
+        }
+        controls.update();
+        renderer.render(scene, camera);
+      }
+    // Handle resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 🔁 Restart animation on button click
+    document.getElementById('restartButton').addEventListener('click', () => {
+      foldAngle = 0;
+      secondFoldAngle = 0;
+      thirdFoldAngle = 0;
+
+      // Also reset flap rotations immediately
+      flaps.forEach((flap, index) => {
+        if (flap) flap.rotation.set(0, 0, 0);
+      });
+    });
+  </script>
+</body>
+</html>
